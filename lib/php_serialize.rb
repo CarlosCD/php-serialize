@@ -39,17 +39,17 @@ require 'stringio'
 # See http://www.php.net/serialize and http://www.php.net/unserialize for
 # details on the PHP side of all this.
 module PHP
-	class StringIOReader < StringIO
-		# Reads data from the buffer until +char+ is found. The
-		# returned string will include +char+.
-		def read_until(char)
-			val, cpos = '', pos
-			if idx = string.index(char, cpos)
-				val = read(idx - cpos + 1)
-			end
-			val
-		end
-	end
+  class StringIOReader < StringIO
+    # Reads data from the buffer until +str+ is found. The
+    # returned string will include +str+.
+    def read_until(str)
+      val, cpos = '', pos
+      if idx = string.index(str, cpos)
+        val = read(idx - cpos + str.size)
+      end
+      val
+    end
+  end
 
 # string = PHP.serialize(mixed var[, bool assoc])
 #
@@ -298,10 +298,14 @@ private
 					val.__send__(attrassign, v)
 				end
 
-			when 's' # string, s:length:"data";
-				len = string.read_until(':').to_i + 3 # quotes, separator
-				val = string.read(len)[1...-2] # read it, kill useless quotes
-				val = val.force_encoding(original_encoding) if val.respond_to?(:force_encoding)
+      when 's' # string, s:length:"data";
+        len = string.read_until(':').to_i + 3 # quotes, separator
+        # 1: Original approach (misbehaves with multi-byte encoding. PHP):
+        # val = string.read(len)[1...-2] # read it, kill useless quotes
+        # 2: Experimental:
+        val = string.read_until('";')[1..-3] # kill quotes and last ';'
+        # puts "s => #{val}"
+        val = val.force_encoding(original_encoding) if val.respond_to?(:force_encoding)
 
 			when 'i' # integer, i:123
 				val = string.read_until(';').to_i
